@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# IDE / PlatformIO
+.vscode/
+.pio/
+
+# Local device and Wi-Fi configuration
+firmware/**/config.h
+error.txt
+program/piano_led/config.local.json
+
+# Material privado que se conserva localmente, pero no se publica
+/docs/
+/INSTALAR_PYTHON_312_PORTATIL.ps1
+/python/LAPTOP_README.md
+/program/piano_led/web.py
+/program/piano_led/web/
