@@ -1,6 +1,7 @@
 #include "bluetooth.h"
 
 #include <Arduino.h>
+#include <cstring>
 
 #if defined(CONFIG_BT_ENABLED) && defined(CONFIG_BLUEDROID_ENABLED)
 #include <BluetoothSerial.h>
@@ -20,7 +21,7 @@ BluetoothSerial bluetooth_serial;
 
 void bluetooth_begin() {
   bluetooth_serial.begin(BLUETOOTH_DEVICE_NAME);
-  bluetooth_serial.setPin(BLUETOOTH_PIN);
+  bluetooth_serial.setPin(BLUETOOTH_PIN, strlen(BLUETOOTH_PIN));
   Serial.print("Bluetooth SPP ready: ");
   Serial.println(BLUETOOTH_DEVICE_NAME);
 }
