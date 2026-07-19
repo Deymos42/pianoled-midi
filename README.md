@@ -35,6 +35,12 @@ piano-led-midi-gui
 
 En la pestaña MIDI selecciona el piano y el ESP32. Se recomienda USB serie para obtener la menor latencia.
 
+### Bluetooth (opcional)
+
+Los ESP32 clásicos pueden exponer **PianoLED MIDI** como Bluetooth serie (SPP). Tras subir el firmware, en Windows ve a **Configuración > Bluetooth y dispositivos > Agregar dispositivo > Bluetooth**, selecciona `PianoLED MIDI` e introduce el PIN `1234` (puedes cambiarlo en `config.h`). Windows creará un puerto COM; pulsa **Actualizar puertos** en la aplicación y selecciónalo.
+
+Bluetooth es práctico sin cable, pero para interpretar MIDI rápido se recomienda el COM USB por su latencia más estable. Las variantes ESP32-C3, C6 y S3 no proporcionan Bluetooth clásico SPP; en ellas esta función se desactiva automáticamente.
+
 ## Estructura
 
 ```

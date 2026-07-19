@@ -101,7 +101,7 @@ class ManualControlTab(QWidget):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
 
-        device_box = QGroupBox("Controlador ESP32 por USB")
+        device_box = QGroupBox("Controlador ESP32 (USB o Bluetooth)")
         device_layout = QGridLayout(device_box)
         self.serial_port = QComboBox()
         self.serial_port.setEditable(True)
@@ -221,7 +221,7 @@ class ManualControlTab(QWidget):
             self._show_error("Selecciona el puerto COM del ESP32.")
             return
         client = SerialLedClient(SerialLedClient.port_name(label), color_order=self._mapping_config.color_order)
-        self.status.setText("Conectando por USB…")
+        self.status.setText("Conectando por serie…")
         self.connect_button.setEnabled(False)
         self._signals.connection_ready.emit(client, None)
 
@@ -264,7 +264,7 @@ class ManualControlTab(QWidget):
         self.status.setText("Desconectado")
 
     def _show_connected(self, info) -> None:  # type: ignore[no-untyped-def]
-        self.status.setText(f"USB conectado: {self._mapping_config.total_led_count} LEDs")
+        self.status.setText(f"Serie conectada: {self._mapping_config.total_led_count} LEDs")
 
     def _show_error(self, message: str) -> None:
         self.status.setText("Error de conexión")

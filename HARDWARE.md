@@ -16,3 +16,7 @@
 5. Inyecta alimentación en más de un punto para tiras largas, usando cable adecuado y respetando polaridades.
 
 Desconecta la alimentación antes de modificar el cableado. Comprueba siempre que la masa sea común antes de encender la tira.
+
+## Bluetooth opcional
+
+El ESP32 Dev Module clásico incluye Bluetooth clásico y puede aparecer en Windows como `PianoLED MIDI`. El PIN por defecto es `1234`, configurable en `config.h`. No necesita cableado adicional; después de emparejarlo, Windows asigna un puerto COM que se selecciona en la aplicación.

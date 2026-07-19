@@ -1,4 +1,4 @@
-"""Low-latency USB serial transport for a directly connected ESP32."""
+"""Serial transport over USB or Bluetooth SPP."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def make_frame(command: int, payload: bytes = b"") -> bytes:
 
 
 class SerialLedClient:
-    """USB serial transport for the ESP32 controller."""
+    """Serial transport for the ESP32 controller (USB or Bluetooth SPP)."""
 
     requires_state_resync = False
 
@@ -112,7 +112,7 @@ class SerialLedClient:
 
     def set_led_count(self, count: int) -> None:
         if not 1 <= count <= 255:
-            raise ValueError("el modo USB serie admite entre 1 y 255 LEDs")
+            raise ValueError("el modo serie admite entre 1 y 255 LEDs")
         self._write(CMD_SET_LED_COUNT, bytes((count,)))
 
     def start_center_wave(self, interval_ms: int = 12) -> None:

@@ -219,7 +219,7 @@ class MidiWindow(QMainWindow):
         piano_form.addRow("Entrada MIDI:", port_row)
         grid.addWidget(piano_box, 0, 0)
 
-        device_box = QGroupBox("2. Controlador LED")
+        device_box = QGroupBox("2. Controlador LED (USB o Bluetooth)")
         device_form = QFormLayout(device_box)
         serial_row = QHBoxLayout()
         self.serial_port = QComboBox()
@@ -229,7 +229,7 @@ class MidiWindow(QMainWindow):
         serial_refresh.clicked.connect(self._refresh_serial_ports)
         serial_row.addWidget(self.serial_port)
         serial_row.addWidget(serial_refresh)
-        device_form.addRow("Puerto ESP32:", serial_row)
+        device_form.addRow("Puerto COM:", serial_row)
         grid.addWidget(device_box, 1, 0)
 
         options_box = QGroupBox("3. Color y expresión")

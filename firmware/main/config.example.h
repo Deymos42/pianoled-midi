@@ -7,6 +7,10 @@
 #define DEVICE_HOSTNAME "pianoled"
 #define OTA_PASSWORD "change-this-password"
 
+// Bluetooth Classic SPP. Windows exposes the paired device as a COM port.
+#define BLUETOOTH_DEVICE_NAME "PianoLED MIDI"
+#define BLUETOOTH_PIN "1234"
+
 #define LED_PIN 25
 #define LED_COUNT 198
 #define MAX_LED_COUNT 255

@@ -74,9 +74,11 @@ void execute_frame() {
 
 void serial_control_begin() { Serial.begin(SERIAL_BAUD); }
 
-void serial_control_handle() {
-  while (Serial.available() > 0) {
-    const uint8_t value = static_cast<uint8_t>(Serial.read());
+void serial_control_handle() { serial_control_handle_stream(Serial); }
+
+void serial_control_handle_stream(Stream& stream) {
+  while (stream.available() > 0) {
+    const uint8_t value = static_cast<uint8_t>(stream.read());
     switch (state) {
       case ParseState::WaitStart:
         if (value == FRAME_START) state = ParseState::Command;
