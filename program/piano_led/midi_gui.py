@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit, QSlider, QSpinBox, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from .esp32 import Esp32Client
 from .gui import ManualControlTab
 from .key_mapping import (
     KEY_LED_COUNTS, MappingConfig, build_key_ranges, format_key_led_counts,
@@ -172,7 +171,6 @@ class MidiWindow(QMainWindow):
         self._refresh_ports()
         self._refresh_serial_ports()
         self._refresh_color_button()
-        self._transport_changed()
 
     def _build_ui(self) -> None:
         root = QWidget(self)
@@ -223,10 +221,6 @@ class MidiWindow(QMainWindow):
 
         device_box = QGroupBox("2. Controlador LED")
         device_form = QFormLayout(device_box)
-        self.transport = QComboBox()
-        self.transport.addItems(("USB serie (baja latencia)", "Wi-Fi"))
-        self.transport.currentIndexChanged.connect(self._transport_changed)
-        self.host = QLineEdit("10.42.0.26")
         serial_row = QHBoxLayout()
         self.serial_port = QComboBox()
         self.serial_port.setEditable(True)
@@ -235,8 +229,6 @@ class MidiWindow(QMainWindow):
         serial_refresh.clicked.connect(self._refresh_serial_ports)
         serial_row.addWidget(self.serial_port)
         serial_row.addWidget(serial_refresh)
-        device_form.addRow("Conexión:", self.transport)
-        device_form.addRow("IP del ESP32:", self.host)
         device_form.addRow("Puerto ESP32:", serial_row)
         grid.addWidget(device_box, 1, 0)
 
@@ -361,10 +353,7 @@ class MidiWindow(QMainWindow):
                 self.serial_port.setEditText(current)
 
     def _transport_changed(self) -> None:
-        serial_mode = self.transport.currentIndex() == 0
-        available = self._agent is None
-        self.host.setEnabled(available and not serial_mode)
-        self.serial_port.setEnabled(available and serial_mode)
+        self.serial_port.setEnabled(self._agent is None)
 
     def _choose_color(self) -> None:
         color = QColorDialog.getColor(self._color, self, "Color de las notas")
@@ -461,15 +450,13 @@ class MidiWindow(QMainWindow):
 
     def _start(self) -> None:
         port_name = self.port_list.currentText()
-        host = self.host.text().strip()
         serial_label = self.serial_port.currentText()
-        serial_mode = self.transport.currentIndex() == 0
-        if not port_name or (serial_mode and not serial_label) or (not serial_mode and not host):
+        if not port_name or not serial_label:
             QMessageBox.warning(self, "PianoLED MIDI", "Selecciona una entrada MIDI y el destino del ESP32.")
             return
         agent: MidiLedAgent | None = None
         try:
-            client = SerialLedClient(SerialLedClient.port_name(serial_label), color_order=self._mapping_config.color_order) if serial_mode else Esp32Client(host)
+            client = SerialLedClient(SerialLedClient.port_name(serial_label), color_order=self._mapping_config.color_order)
             agent = MidiLedAgent(client, self._rgb(), self._key_ranges, self.midi_effect.currentData())
             agent.state.set_color_style(self.color_style.currentData(), self._palette_rgb(self.left_color), self._palette_rgb(self.right_color), self.split_key.value())
             agent.state.set_sustain_enabled(self.sustain.isChecked())
@@ -485,8 +472,6 @@ class MidiWindow(QMainWindow):
                 agent.close()
             QMessageBox.warning(self, "PianoLED MIDI", str(error))
             return
-        self.host.setEnabled(False)
-        self.transport.setEnabled(False)
         self.port_list.setEnabled(False)
         self.serial_port.setEnabled(False)
         self.status.setText(f"Activo: {port_name}")
@@ -503,8 +488,6 @@ class MidiWindow(QMainWindow):
         if self._agent:
             self._agent.close()
             self._agent = None
-        self.host.setEnabled(True)
-        self.transport.setEnabled(True)
         self.port_list.setEnabled(True)
         self._transport_changed()
         self.status.setText("MIDI detenido.")

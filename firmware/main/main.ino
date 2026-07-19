@@ -1,11 +1,7 @@
 #include "leds.h"
 #include "ota.h"
 #include "pianoled_connection.h"
-#include "pianoled_discovery.h"
 #include "serial_control.h"
-#include "udp.h"
-
-#include <WiFi.h>
 
 void setup() {
   serial_control_begin();
@@ -16,25 +12,18 @@ void setup() {
   leds_startup_sequence();
   pianoled_connection_begin();
 
-  Serial.print("Connecting to Wi-Fi");
-  while (!pianoled_connection_is_ready()) {
-    Serial.print('.');
-    delay(1000);
-  }
-  Serial.println();
-  Serial.print("Wi-Fi connected. IP: ");
-  Serial.println(WiFi.localIP());
-
-  ota_begin();
-  udp_begin();
-  pianoled_discovery_begin();
-  Serial.println("UDP listening on port 4210");
-  Serial.println("OTA ready");
+  Serial.println("USB serial ready");
+  Serial.println("Wi-Fi is optional and reserved for OTA updates");
 }
 
 void loop() {
-  ota_handle();
+  static bool ota_ready = false;
+  if (!ota_ready && pianoled_connection_is_ready()) {
+    ota_begin();
+    ota_ready = true;
+    Serial.println("OTA ready");
+  }
+  if (ota_ready) ota_handle();
   serial_control_handle();
-  udp_handle();
   leds_animation_handle();
 }

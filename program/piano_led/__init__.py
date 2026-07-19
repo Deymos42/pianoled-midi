@@ -1,5 +1,5 @@
-"""PianoLED: communication primitives for the ESP32 LED controller."""
+"""PianoLED MIDI desktop application and USB serial transport."""
 
-from .esp32 import Esp32Client, DeviceInfo
+from .serial_transport import SerialLedClient
 
-__all__ = ["DeviceInfo", "Esp32Client"]
+__all__ = ["SerialLedClient"]

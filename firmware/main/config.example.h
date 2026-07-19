@@ -14,5 +14,4 @@
 // Use GRB for a standard WS2812B; set RGB only if your installed strip needs it.
 #define LED_COLOR_ORDER BGR
 #define FIRMWARE_VERSION 13
-#define UDP_PORT 4210
 #define SERIAL_BAUD 921600

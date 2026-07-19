@@ -13,14 +13,12 @@ from PySide6.QtWidgets import (
     QSlider, QSpinBox, QToolButton, QVBoxLayout, QWidget, QColorDialog,
 )
 
-from .discovery import DiscoveredDevice, discover
 from .effects import rainbow_color
-from .esp32 import DeviceInfo, Esp32Client
 from .key_mapping import MappingConfig, build_key_ranges
+from .serial_transport import SerialLedClient
 
 
 class Signals(QObject):
-    discovered = Signal(list)
     error = Signal(str)
     connected = Signal(object)
     connection_ready = Signal(object, object)
@@ -81,11 +79,10 @@ class ManualControlTab(QWidget):
     def __init__(self, mapping_config: MappingConfig = MappingConfig()) -> None:
         super().__init__()
         self.setMinimumWidth(620)
-        self._client: Esp32Client | None = None
+        self._client: SerialLedClient | None = None
         self._color = QColor("#ffffff")
         self._executor = ThreadPoolExecutor(max_workers=1)
         self._signals = Signals()
-        self._signals.discovered.connect(self._show_discovered)
         self._signals.connected.connect(self._show_connected)
         self._signals.connection_ready.connect(self._connected)
         self._signals.error.connect(self._show_error)
@@ -104,27 +101,22 @@ class ManualControlTab(QWidget):
         layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(14)
 
-        device_box = QGroupBox("Controlador ESP32")
+        device_box = QGroupBox("Controlador ESP32 por USB")
         device_layout = QGridLayout(device_box)
-        self.device_list = QComboBox()
-        self.host = QLineEdit("10.42.0.26")
-        self.port = QSpinBox(); self.port.setRange(1, 65535); self.port.setValue(4210)
+        self.serial_port = QComboBox()
+        self.serial_port.setEditable(True)
+        self.serial_port.setPlaceholderText("COM3")
         self.status = QLabel("Sin conectar")
         self.status.setObjectName("status")
-        scan = QPushButton("Buscar dispositivos")
-        scan.clicked.connect(self._scan)
+        scan = QPushButton("Actualizar puertos")
+        scan.clicked.connect(self._refresh_serial_ports)
         self.connect_button = QPushButton("Conectar")
         self.connect_button.clicked.connect(self._toggle_connection)
-        self.device_list.activated.connect(self._select_device)
-        device_layout.addWidget(QLabel("Detectados:"), 0, 0)
-        device_layout.addWidget(self.device_list, 0, 1, 1, 2)
+        device_layout.addWidget(QLabel("Puerto COM:"), 0, 0)
+        device_layout.addWidget(self.serial_port, 0, 1, 1, 2)
         device_layout.addWidget(scan, 0, 3)
-        device_layout.addWidget(QLabel("IP / host:"), 1, 0)
-        device_layout.addWidget(self.host, 1, 1)
-        device_layout.addWidget(QLabel("Puerto:"), 1, 2)
-        device_layout.addWidget(self.port, 1, 3)
-        device_layout.addWidget(self.status, 2, 0, 1, 3)
-        device_layout.addWidget(self.connect_button, 2, 3)
+        device_layout.addWidget(self.status, 1, 0, 1, 3)
+        device_layout.addWidget(self.connect_button, 1, 3)
         layout.addWidget(device_box)
         controls = QGridLayout()
         controls.setHorizontalSpacing(14)
@@ -196,6 +188,7 @@ class ManualControlTab(QWidget):
         controls.addWidget(effects_box, 3, 0, 1, 2)
         layout.addStretch()
         self.apply_mapping_config(self._mapping_config)
+        self._refresh_serial_ports()
 
     def _run(self, action, callback=None):
         future = self._executor.submit(action)
@@ -210,21 +203,11 @@ class ManualControlTab(QWidget):
         future.add_done_callback(done)
         return future
 
-    def _scan(self) -> None:
-        self.status.setText("Buscando por mDNS…")
-        self._run(discover, self._signals.discovered.emit)
-
-    def _show_discovered(self, devices: list[DiscoveredDevice]) -> None:
-        self.device_list.clear()
-        for device in devices:
-            self.device_list.addItem(f"{device.name} — {device.host}:{device.port}", device)
-        self.status.setText(f"{len(devices)} dispositivo(s) encontrado(s)" if devices else "No se encontró ningún dispositivo; usa la IP manual.")
-
-    def _select_device(self, index: int) -> None:
-        device = self.device_list.itemData(index)
-        if isinstance(device, DiscoveredDevice):
-            self.host.setText(device.host)
-            self.port.setValue(device.port)
+    def _refresh_serial_ports(self) -> None:
+        current = self.serial_port.currentText()
+        self.serial_port.clear()
+        self.serial_port.addItems(SerialLedClient.available_ports())
+        self.serial_port.setEditText(current)
 
     def _toggle_connection(self) -> None:
         if self._client is not None:
@@ -233,15 +216,18 @@ class ManualControlTab(QWidget):
             self._connect()
 
     def _connect(self) -> None:
-        client = Esp32Client(self.host.text().strip(), self.port.value())
-        self.status.setText("Comprobando conexión…")
+        label = self.serial_port.currentText()
+        if not label:
+            self._show_error("Selecciona el puerto COM del ESP32.")
+            return
+        client = SerialLedClient(SerialLedClient.port_name(label), color_order=self._mapping_config.color_order)
+        self.status.setText("Conectando por USB…")
         self.connect_button.setEnabled(False)
-        self._run(client.info, lambda info: self._signals.connection_ready.emit(client, info))
+        self._signals.connection_ready.emit(client, None)
 
-    def _connected(self, client: Esp32Client, info: DeviceInfo) -> None:
+    def _connected(self, client: SerialLedClient, info) -> None:  # type: ignore[no-untyped-def]
         self._client = client
         self.apply_mapping_config(self._mapping_config)
-        self.brightness.setValue(info.brightness)
         self.connect_button.setEnabled(True)
         self.connect_button.setText("Desconectar")
         self._signals.connected.emit(info)
@@ -277,15 +263,15 @@ class ManualControlTab(QWidget):
         self.connect_button.setText("Conectar")
         self.status.setText("Desconectado")
 
-    def _show_connected(self, info: DeviceInfo) -> None:
-        self.status.setText(f"Conectado a {info.hostname}: {self._mapping_config.total_led_count} LEDs, brillo {info.brightness}")
+    def _show_connected(self, info) -> None:  # type: ignore[no-untyped-def]
+        self.status.setText(f"USB conectado: {self._mapping_config.total_led_count} LEDs")
 
     def _show_error(self, message: str) -> None:
         self.status.setText("Error de conexión")
         self.connect_button.setEnabled(True)
         QMessageBox.warning(self, "PianoLED", message)
 
-    def _require_client(self) -> Esp32Client | None:
+    def _require_client(self) -> SerialLedClient | None:
         if self._client is None:
             QMessageBox.information(self, "PianoLED", "Conéctate primero al controlador ESP32.")
         return self._client
@@ -320,7 +306,7 @@ class ManualControlTab(QWidget):
             self._run(lambda: client.set_brightness(brightness))
 
     @staticmethod
-    def _paint_range(client: Esp32Client, start: int, count: int, maximum: int, color: tuple[int, int, int]) -> None:
+    def _paint_range(client: SerialLedClient, start: int, count: int, maximum: int, color: tuple[int, int, int]) -> None:
         """Atomically illuminate a range and clear all remaining LEDs."""
         client.show_range(start, min(count, maximum + 1 - start), *color)
 

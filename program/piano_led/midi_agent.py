@@ -9,8 +9,8 @@ import colorsys
 from collections.abc import Iterable
 from typing import Any
 
-from .esp32 import Esp32Client
 from .key_mapping import KEY_RANGES, KeyRange
+from .serial_transport import SerialLedClient
 
 FIRST_MIDI_NOTE = 21  # A0
 LAST_MIDI_NOTE = 108  # C8
@@ -152,7 +152,7 @@ class MidiLedState:
 
 
 class MidiLedAgent:
-    def __init__(self, client: Esp32Client, color: tuple[int, int, int], key_ranges: tuple[KeyRange, ...] = KEY_RANGES, effect_mode: str = "direct") -> None:
+    def __init__(self, client: SerialLedClient, color: tuple[int, int, int], key_ranges: tuple[KeyRange, ...] = KEY_RANGES, effect_mode: str = "direct") -> None:
         self.client = client
         self.state = MidiLedState(color, key_ranges=key_ranges)
         self.effect_mode = effect_mode
@@ -272,7 +272,7 @@ class MidiLedAgent:
             self._frame_ready.set()
 
     def _send_frames(self) -> None:
-        """Send immediate deltas, then repair any lost UDP delta with one full state frame."""
+        """Send immediate serial deltas; USB is ordered and does not lose packets."""
         resync_at: float | None = None
         while not self._stop.is_set():
             timeout = None if resync_at is None else max(0, resync_at - time.monotonic())
@@ -305,7 +305,7 @@ class MidiLedAgent:
                     resync_at = None
                 elif ranges:
                     self.client.set_ranges_realtime(ranges)
-                    # A Wi-Fi state resync would erase local spark/fade animations.
+                    # A later full snapshot would erase local spark/fade animations.
                     resync_at = None if fades else (time.monotonic() + STATE_RESYNC_SECONDS if getattr(self.client, "requires_state_resync", True) else None)
                 for start, red, green, blue in waves:
                     self.client.start_note_wave(start, red, green, blue, self.wave_interval_ms)
@@ -313,8 +313,7 @@ class MidiLedAgent:
                     self.client.start_note_fade(start, count, red, green, blue, duration)
                 continue
 
-            # A delta packet may be lost despite being duplicated. This snapshot is sent
-            # after the musical event, so it repairs stale LEDs without delaying the note.
+            # Kept for transports that request a periodic state snapshot.
             with self._lock:
                 frame = self.state.frame()
             self.client.set_frame_realtime(frame)
@@ -341,8 +340,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Agente MIDI local de PianoLED")
     parser.add_argument("--list-ports", action="store_true", help="Mostrar entradas MIDI disponibles y salir")
     parser.add_argument("--port", help="Nombre, o parte del nombre, de la entrada MIDI")
-    parser.add_argument("--esp-host", default="10.42.0.26")
-    parser.add_argument("--esp-port", type=int, default=4210)
+    parser.add_argument("--serial-port", help="Puerto COM del ESP32, por ejemplo COM3")
     parser.add_argument("--color", type=parse_color, default=(255, 255, 255), help="Color RRGGBB, por defecto FFFFFF")
     parser.add_argument("--headless", action="store_true", help="Ejecutar sin interfaz gr\u00e1fica")
     args = parser.parse_args()
@@ -366,7 +364,9 @@ def main() -> None:
     except ValueError as error:
         raise SystemExit(str(error)) from error
 
-    agent = MidiLedAgent(Esp32Client(args.esp_host, args.esp_port), args.color)
+    if not args.serial_port:
+        raise SystemExit("Indica el ESP32 con --serial-port COM3")
+    agent = MidiLedAgent(SerialLedClient(args.serial_port), args.color)
     agent.start()
     print(f"PianoLED MIDI conectado a: {port_name}")
     print("Pulsa Ctrl+C para detenerlo.")
