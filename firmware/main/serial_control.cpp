@@ -14,6 +14,9 @@ constexpr uint8_t CMD_SET_LED_COUNT = 0x25;
 constexpr uint8_t CMD_START_CENTER_WAVE = 0x26;
 constexpr uint8_t CMD_START_NOTE_WAVE = 0x27;
 constexpr uint8_t CMD_START_NOTE_FADE = 0x28;
+constexpr uint8_t CMD_START_SWEEP = 0x29;
+constexpr uint8_t CMD_START_RAINBOW = 0x2A;
+constexpr uint8_t CMD_STOP_ANIMATION = 0x2B;
 constexpr uint8_t MAX_PAYLOAD_SIZE = 250;
 
 enum class ParseState : uint8_t { WaitStart, Command, Length, Payload, Checksum };
@@ -55,6 +58,15 @@ void execute_frame() {
       break;
     case CMD_START_NOTE_FADE:
       if (length == 7) leds_start_note_fade(payload[0], payload[1], payload[2], payload[3], payload[4], (payload[5] << 8) | payload[6]);
+      break;
+    case CMD_START_SWEEP:
+      if (length == 5) leds_start_sweep(payload[0], payload[1], payload[2], (payload[3] << 8) | payload[4]);
+      break;
+    case CMD_START_RAINBOW:
+      if (length == 2) leds_start_rainbow((payload[0] << 8) | payload[1]);
+      break;
+    case CMD_STOP_ANIMATION:
+      if (length == 0) leds_stop_animation();
       break;
   }
 }

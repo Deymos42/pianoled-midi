@@ -344,12 +344,18 @@ class ManualControlTab(QWidget):
             return
         self._stop_effect()
         self._effect_name, self._effect_index, self._effect_future = name, 0, None
-        # Manual animations run on the PC so the ESP32 can reserve flash for
-        # Bluetooth and OTA. Frames still travel over the low-latency serial link.
-        self._effect_timer.start(30 if name == "rainbow" else 50)
+        if name == "sweep":
+            color = self._device_rgb(*self._rgb())
+            self._effect_future = self._run(lambda: client.start_sweep(*color, 50))
+        elif name == "rainbow":
+            self._effect_future = self._run(lambda: client.start_rainbow(30))
+        else:
+            self._effect_timer.start(30)
 
     def _stop_effect(self) -> None:
         self._effect_timer.stop()
+        if self._effect_name in ("sweep", "rainbow") and self._client is not None:
+            self._run(self._client.stop_animation)
         self._effect_name = None
 
     def _effect_tick(self) -> None:
@@ -362,15 +368,7 @@ class ManualControlTab(QWidget):
         count = self.range_start.maximum() + 1
         if self._effect_name == "rainbow":
             frame = tuple(self._device_rgb(*rainbow_color(self._effect_index + pixel, count)) for pixel in range(count))
-            self._effect_future = self._run(lambda: client.set_frame_realtime(frame))
-            self._effect_index = (self._effect_index + 1) % count
-        elif self._effect_name == "sweep":
-            color = self._device_rgb(*self._rgb())
-            frame = [(0, 0, 0)] * count
-            frame[self._effect_index % count] = color
-            if count > 1:
-                frame[(self._effect_index + 1) % count] = color
-            self._effect_future = self._run(lambda: client.set_frame_realtime(frame))
+            self._effect_future = self._run(lambda: client.set_frame(frame))
             self._effect_index = (self._effect_index + 1) % count
 
     def shutdown(self) -> None:

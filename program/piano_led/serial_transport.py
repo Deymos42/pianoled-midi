@@ -12,6 +12,9 @@ CMD_SET_LED_COUNT = 0x25
 CMD_START_CENTER_WAVE = 0x26
 CMD_START_NOTE_WAVE = 0x27
 CMD_START_NOTE_FADE = 0x28
+CMD_START_SWEEP = 0x29
+CMD_START_RAINBOW = 0x2A
+CMD_STOP_ANIMATION = 0x2B
 MAX_RANGES_PER_PACKET = 50
 
 
@@ -98,6 +101,14 @@ class SerialLedClient:
     def fill(self, red: int, green: int, blue: int) -> None:
         self.set_ranges_realtime(((0, 255, red, green, blue),))
 
+    def start_sweep(self, red: int, green: int, blue: int, interval_ms: int) -> None:
+        self._write(CMD_START_SWEEP, bytes((*self._to_strip_color(red, green, blue), interval_ms >> 8, interval_ms & 0xFF)))
+
+    def start_rainbow(self, interval_ms: int) -> None:
+        self._write(CMD_START_RAINBOW, bytes((interval_ms >> 8, interval_ms & 0xFF)))
+
+    def stop_animation(self) -> None:
+        self._write(CMD_STOP_ANIMATION)
 
     def set_led_count(self, count: int) -> None:
         if not 1 <= count <= 255:
