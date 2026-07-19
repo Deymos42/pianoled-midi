@@ -95,8 +95,11 @@ class Esp32Client:
     def start_center_wave(self, interval_ms: int = 12) -> None:
         self._send(protocol.start_center_wave(interval_ms))
 
-    def start_note_wave(self, start: int, red: int, green: int, blue: int) -> None:
-        self._send(protocol.start_note_wave(start, red, green, blue))
+    def start_note_wave(self, start: int, red: int, green: int, blue: int, interval_ms: int | None = None) -> None:
+        self._send(protocol.start_note_wave(start, red, green, blue, interval_ms))
+
+    def start_note_fade(self, start: int, count: int, red: int, green: int, blue: int, duration_ms: int) -> None:
+        self._send(protocol.start_note_fade(start, count, red, green, blue, duration_ms))
 
     def set_frame(self, pixels: Sequence[tuple[int, int, int]]) -> None:
         self._send(protocol.set_frame(pixels))

@@ -16,6 +16,8 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(protocol.set_led_count(198), b"\x14\xc6")
         self.assertEqual(protocol.start_center_wave(12), b"\x15\x00\x0c")
         self.assertEqual(protocol.start_note_wave(20, 1, 2, 3), b"\x16\x14\x01\x02\x03")
+        self.assertEqual(protocol.start_note_wave(20, 1, 2, 3, 25), b"\x16\x14\x01\x02\x03\x00\x19")
+        self.assertEqual(protocol.start_note_fade(20, 3, 1, 2, 3, 700), b"\x17\x14\x03\x01\x02\x03\x02\xbc")
         self.assertEqual(protocol.begin_realtime_session(1), b"\x10\x00\x01")
         self.assertEqual(protocol.show_range_realtime(1, 2, 3, 4, 5, 6, 7), b"\x11\x00\x01\x00\x02\x03\x04\x05\x06\x07")
         self.assertEqual(protocol.set_ranges_realtime(1, 2, ((3, 4, 5, 6, 7),)), b"\x13\x00\x01\x00\x02\x03\x04\x05\x06\x07")

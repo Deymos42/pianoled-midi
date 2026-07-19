@@ -11,6 +11,7 @@ CMD_CLEAR = 0x23
 CMD_SET_LED_COUNT = 0x25
 CMD_START_CENTER_WAVE = 0x26
 CMD_START_NOTE_WAVE = 0x27
+CMD_START_NOTE_FADE = 0x28
 MAX_RANGES_PER_PACKET = 50
 
 
@@ -98,8 +99,14 @@ class SerialLedClient:
     def start_center_wave(self, interval_ms: int = 12) -> None:
         self._write(CMD_START_CENTER_WAVE, bytes((interval_ms >> 8, interval_ms & 0xFF)))
 
-    def start_note_wave(self, start: int, red: int, green: int, blue: int) -> None:
-        self._write(CMD_START_NOTE_WAVE, bytes((start, *self._to_strip_color(red, green, blue))))
+    def start_note_wave(self, start: int, red: int, green: int, blue: int, interval_ms: int | None = None) -> None:
+        payload = bytes((start, *self._to_strip_color(red, green, blue)))
+        if interval_ms is not None:
+            payload += bytes((interval_ms >> 8, interval_ms & 0xFF))
+        self._write(CMD_START_NOTE_WAVE, payload)
+
+    def start_note_fade(self, start: int, count: int, red: int, green: int, blue: int, duration_ms: int) -> None:
+        self._write(CMD_START_NOTE_FADE, bytes((start, count, *self._to_strip_color(red, green, blue), duration_ms >> 8, duration_ms & 0xFF)))
 
     def close(self) -> None:
         self._serial.close()

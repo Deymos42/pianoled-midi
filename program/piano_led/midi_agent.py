@@ -118,12 +118,6 @@ class MidiLedState:
         if self.color_style == "rainbow":
             red, green, blue = colorsys.hsv_to_rgb((time.monotonic() * 0.08 + position) % 1, 0.9, 1)
             return round(red * 255), round(green * 255), round(blue * 255)
-        if self.color_style == "gradient":
-            if position < 0.7:
-                t = position / 0.7
-                return round(40 + 215 * t), round(80 + 130 * t), round(255 - 100 * t)
-            t = (position - 0.7) / 0.3
-            return 255, round(210 + 45 * t), round(155 + 100 * t)
         if self.color_style == "split":
             return self.left_color if key <= self.split_key else self.right_color
         return self.color
@@ -162,10 +156,13 @@ class MidiLedAgent:
         self.client = client
         self.state = MidiLedState(color, key_ranges=key_ranges)
         self.effect_mode = effect_mode
+        self.fade_duration_ms = 700
+        self.wave_interval_ms = 18
         self._lock = threading.Lock()
         self._frame_ready = threading.Event()
         self._pending_ranges: dict[int, tuple[int, int, int, int, int]] = {}
         self._pending_waves: list[tuple[int, int, int, int]] = []
+        self._pending_fades: list[tuple[int, int, int, int, int, int]] = []
         self._full_frame_pending = False
         self._stop = threading.Event()
         self._worker = threading.Thread(target=self._send_frames, name="pianoled-midi-output", daemon=True)
@@ -191,10 +188,16 @@ class MidiLedAgent:
         changed_note: int | None = None
         requires_full_frame = False
         with self._lock:
+            previous_update: tuple[int, int, int, int, int] | None = None
             if message.type == "note_on":
-                changed = self.state.note_off(message.note) if message.velocity == 0 else self.state.note_on(message.note, message.velocity)
+                if message.velocity == 0:
+                    previous_update = self.state.range_update(message.note) if self.state.is_piano_note(message.note) else None
+                    changed = self.state.note_off(message.note)
+                else:
+                    changed = self.state.note_on(message.note, message.velocity)
                 changed_note = message.note
             elif message.type == "note_off":
+                previous_update = self.state.range_update(message.note) if self.state.is_piano_note(message.note) else None
                 changed = self.state.note_off(message.note)
                 changed_note = message.note
             elif message.type == "control_change" and message.control == 64:
@@ -205,7 +208,22 @@ class MidiLedAgent:
                     update = self.state.range_update(changed_note)
                     if self.effect_mode == "wave" and message.type == "note_on" and message.velocity > 0:
                         self._pending_waves.append((update[0] + update[1] // 2, update[2], update[3], update[4]))
-                    elif self.effect_mode == "direct":
+                    elif self.effect_mode == "constellation" and message.type == "note_on" and message.velocity > 0:
+                        # Main key is immediate; two dim neighbouring sparks fade locally.
+                        self._pending_ranges[update[0]] = update
+                        red, green, blue = (channel // 3 for channel in update[2:])
+                        if update[0] > 0:
+                            self._pending_fades.append((update[0] - 1, 1, red, green, blue, self.fade_duration_ms))
+                        right = update[0] + update[1]
+                        if right < self.state.led_count:
+                            self._pending_fades.append((right, 1, red, green, blue, self.fade_duration_ms))
+                    elif self.effect_mode == "fade":
+                        if previous_update and update[2:] == (0, 0, 0) and previous_update[2:] != (0, 0, 0):
+                            self._pending_fades.append((*previous_update, self.fade_duration_ms))
+                        else:
+                            # The key must be visible at note-on; only note-off fades.
+                            self._pending_ranges[update[0]] = update
+                    elif self.effect_mode in {"direct", "constellation"}:
                         self._pending_ranges[update[0]] = update
                 if requires_full_frame:
                     self._full_frame_pending = True
@@ -230,13 +248,22 @@ class MidiLedAgent:
             self._frame_ready.set()
 
     def set_effect_mode(self, effect_mode: str) -> None:
-        if effect_mode not in {"direct", "wave"}:
+        if effect_mode not in {"direct", "fade", "wave", "constellation"}:
             raise ValueError("modo de efecto no válido")
         with self._lock:
             self.effect_mode = effect_mode
             self._pending_waves.clear()
-            self._full_frame_pending = effect_mode == "direct"
+            self._pending_fades.clear()
+            self._full_frame_pending = effect_mode in {"direct", "fade", "constellation"}
             self._frame_ready.set()
+
+    def set_fade_duration(self, duration_ms: int) -> None:
+        with self._lock:
+            self.fade_duration_ms = max(100, min(5000, duration_ms))
+
+    def set_wave_interval(self, interval_ms: int) -> None:
+        with self._lock:
+            self.wave_interval_ms = max(8, min(200, interval_ms))
 
     def set_color_style(self, style: str, left_color: tuple[int, int, int], right_color: tuple[int, int, int], split_key: int) -> None:
         with self._lock:
@@ -264,20 +291,26 @@ class MidiLedAgent:
                         self._pending_ranges.clear()
                         ranges = ()
                         waves = ()
+                        fades = ()
                     else:
                         frame = ()
                         ranges = tuple(self._pending_ranges.values())
                         self._pending_ranges.clear()
                         waves = tuple(self._pending_waves)
                         self._pending_waves.clear()
+                        fades = tuple(self._pending_fades)
+                        self._pending_fades.clear()
                 if frame:
                     self.client.set_frame_realtime(frame)
                     resync_at = None
                 elif ranges:
                     self.client.set_ranges_realtime(ranges)
-                    resync_at = time.monotonic() + STATE_RESYNC_SECONDS if getattr(self.client, "requires_state_resync", True) else None
+                    # A Wi-Fi state resync would erase local spark/fade animations.
+                    resync_at = None if fades else (time.monotonic() + STATE_RESYNC_SECONDS if getattr(self.client, "requires_state_resync", True) else None)
                 for start, red, green, blue in waves:
-                    self.client.start_note_wave(start, red, green, blue)
+                    self.client.start_note_wave(start, red, green, blue, self.wave_interval_ms)
+                for start, count, red, green, blue, duration in fades:
+                    self.client.start_note_fade(start, count, red, green, blue, duration)
                 continue
 
             # A delta packet may be lost despite being duplicated. This snapshot is sent

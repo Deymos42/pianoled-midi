@@ -21,11 +21,23 @@ uint8_t rainbow_hue = 0;
 uint16_t wave_left = 0;
 uint16_t wave_right = 0;
 constexpr uint8_t MAX_NOTE_WAVES = 8;
-constexpr uint8_t NOTE_WAVE_STEP_MS = 14;
+uint16_t note_wave_step_ms = 14;
 constexpr uint8_t NOTE_WAVE_FADE_STEP = 2;
 struct NoteWave { bool active; int16_t left; int16_t right; uint8_t red; uint8_t green; uint8_t blue; uint8_t step; };
 NoteWave note_waves[MAX_NOTE_WAVES] = {};
 uint32_t note_wave_last_step_ms = 0;
+constexpr uint8_t MAX_NOTE_FADES = 16;
+struct NoteFade { bool active; uint8_t start; uint8_t count; uint8_t red; uint8_t green; uint8_t blue; uint32_t started_ms; uint16_t duration_ms; };
+NoteFade note_fades[MAX_NOTE_FADES] = {};
+
+void cancel_note_fades(uint8_t start, uint8_t count) {
+  const uint16_t end = static_cast<uint16_t>(start) + count;
+  for (NoteFade& fade : note_fades) {
+    if (!fade.active) continue;
+    const uint16_t fade_end = static_cast<uint16_t>(fade.start) + fade.count;
+    if (start < fade_end && fade.start < end) fade.active = false;
+  }
+}
 }
 
 void leds_begin() {
@@ -62,6 +74,7 @@ void leds_set(uint8_t index, uint8_t red, uint8_t green, uint8_t blue) {
 
 void leds_set_range(uint8_t start, uint8_t count, uint8_t red, uint8_t green, uint8_t blue) {
   if (start >= active_led_count || count == 0) return;
+  cancel_note_fades(start, count);
   const uint16_t requested_end = static_cast<uint16_t>(start) + count;
   const uint16_t end = requested_end > active_led_count ? active_led_count : requested_end;
   for (uint16_t index = start; index < end; ++index) {
@@ -76,6 +89,7 @@ void leds_set_ranges(const uint8_t* ranges, uint8_t range_count) {
     const uint8_t start = range[0];
     const uint8_t count = range[1];
     if (start >= active_led_count || count == 0) continue;
+    cancel_note_fades(start, count);
     const uint16_t requested_end = static_cast<uint16_t>(start) + count;
     const uint16_t end = requested_end > active_led_count ? active_led_count : requested_end;
     for (uint16_t index = start; index < end; ++index) {
@@ -99,6 +113,7 @@ void leds_show_range(uint8_t start, uint8_t count, uint8_t red, uint8_t green, u
 
 void leds_set_frame(const uint8_t* rgb, uint16_t pixel_count) {
   if (pixel_count != active_led_count) return;
+  for (NoteFade& fade : note_fades) fade.active = false;
   for (uint16_t index = 0; index < active_led_count; ++index) {
     const uint16_t offset = index * 3;
     pixels[index] = CRGB(rgb[offset], rgb[offset + 1], rgb[offset + 2]);
@@ -142,14 +157,25 @@ void leds_start_center_wave(uint16_t interval_ms) {
   active_animation = Animation::CenterWave;
 }
 
-void leds_start_note_wave(uint8_t start, uint8_t red, uint8_t green, uint8_t blue) {
+void leds_start_note_wave(uint8_t start, uint8_t red, uint8_t green, uint8_t blue, uint16_t interval_ms) {
   uint8_t selected = 0;
   for (uint8_t index = 0; index < MAX_NOTE_WAVES; ++index) {
     if (!note_waves[index].active) { selected = index; break; }
     if (note_waves[index].step > note_waves[selected].step) selected = index;
   }
   note_waves[selected] = {true, start, start, red, green, blue, 0};
+  note_wave_step_ms = interval_ms < 8 ? 8 : interval_ms;
   note_wave_last_step_ms = 0;
+}
+
+void leds_start_note_fade(uint8_t start, uint8_t count, uint8_t red, uint8_t green, uint8_t blue, uint16_t duration_ms) {
+  if (start >= active_led_count || count == 0) return;
+  uint8_t selected = 0;
+  for (uint8_t index = 0; index < MAX_NOTE_FADES; ++index) {
+    if (!note_fades[index].active) { selected = index; break; }
+    if (note_fades[index].started_ms < note_fades[selected].started_ms) selected = index;
+  }
+  note_fades[selected] = {true, start, count, red, green, blue, millis(), duration_ms < 50 ? 50 : duration_ms};
 }
 
 void leds_stop_animation() { active_animation = Animation::None; }
@@ -158,7 +184,7 @@ void leds_animation_handle() {
   const uint32_t now = millis();
   bool has_note_wave = false;
   for (const NoteWave& wave : note_waves) has_note_wave = has_note_wave || wave.active;
-  if (has_note_wave && now - note_wave_last_step_ms >= NOTE_WAVE_STEP_MS) {
+  if (has_note_wave && now - note_wave_last_step_ms >= note_wave_step_ms) {
     note_wave_last_step_ms = now;
     fill_solid(pixels, active_led_count, CRGB::Black);
     for (NoteWave& wave : note_waves) {
@@ -177,6 +203,23 @@ void leds_animation_handle() {
     bool waves_remaining = false;
     for (const NoteWave& wave : note_waves) waves_remaining = waves_remaining || wave.active;
     if (!waves_remaining) leds_clear();
+    return;
+  }
+  bool fade_changed = false;
+  for (NoteFade& fade : note_fades) {
+    if (!fade.active) continue;
+    const uint32_t elapsed = now - fade.started_ms;
+    const uint8_t level = elapsed >= fade.duration_ms ? 0 : 255 - (elapsed * 255UL) / fade.duration_ms;
+    uint16_t end = static_cast<uint16_t>(fade.start) + fade.count;
+    if (end > active_led_count) end = active_led_count;
+    for (uint16_t index = fade.start; index < end; ++index) {
+      pixels[index] = CRGB((fade.red * level) / 255, (fade.green * level) / 255, (fade.blue * level) / 255);
+    }
+    if (elapsed >= fade.duration_ms) fade.active = false;
+    fade_changed = true;
+  }
+  if (fade_changed) {
+    FastLED.show();
     return;
   }
   if (active_animation == Animation::None) return;

@@ -28,6 +28,7 @@ constexpr uint8_t CMD_SET_RANGES_REALTIME = 0x13;
 constexpr uint8_t CMD_SET_LED_COUNT = 0x14;
 constexpr uint8_t CMD_START_CENTER_WAVE = 0x15;
 constexpr uint8_t CMD_START_NOTE_WAVE = 0x16;
+constexpr uint8_t CMD_START_NOTE_FADE = 0x17;
 constexpr size_t MAX_PACKET_SIZE = 600;
 
 WiFiUDP server;
@@ -161,6 +162,10 @@ void udp_handle() {
       break;
     case CMD_START_NOTE_WAVE:
       if (length == 5) leds_start_note_wave(packet[1], packet[2], packet[3], packet[4]);
+      else if (length == 7) leds_start_note_wave(packet[1], packet[2], packet[3], packet[4], (packet[5] << 8) | packet[6]);
+      break;
+    case CMD_START_NOTE_FADE:
+      if (length == 8) leds_start_note_fade(packet[1], packet[2], packet[3], packet[4], packet[5], (packet[6] << 8) | packet[7]);
       break;
   }
 }

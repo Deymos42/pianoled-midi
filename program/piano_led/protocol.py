@@ -30,6 +30,7 @@ class Command(IntEnum):
     SET_LED_COUNT = 0x14
     START_CENTER_WAVE = 0x15
     START_NOTE_WAVE = 0x16
+    START_NOTE_FADE = 0x17
 
 
 @dataclass(frozen=True)
@@ -94,8 +95,13 @@ def start_center_wave(interval_ms: int) -> bytes:
     return bytes((Command.START_CENTER_WAVE, interval_ms >> 8, interval_ms & 0xFF))
 
 
-def start_note_wave(start: int, red: int, green: int, blue: int) -> bytes:
-    return bytes((Command.START_NOTE_WAVE, _byte(start, "start"), _byte(red, "red"), _byte(green, "green"), _byte(blue, "blue")))
+def start_note_wave(start: int, red: int, green: int, blue: int, interval_ms: int | None = None) -> bytes:
+    packet = bytes((Command.START_NOTE_WAVE, _byte(start, "start"), _byte(red, "red"), _byte(green, "green"), _byte(blue, "blue")))
+    return packet if interval_ms is None else packet + bytes((interval_ms >> 8, interval_ms & 0xFF))
+
+
+def start_note_fade(start: int, count: int, red: int, green: int, blue: int, duration_ms: int) -> bytes:
+    return bytes((Command.START_NOTE_FADE, _byte(start, "start"), _byte(count, "count"), _byte(red, "red"), _byte(green, "green"), _byte(blue, "blue"), duration_ms >> 8, duration_ms & 0xFF))
 
 
 def begin_realtime_session(session: int) -> bytes:

@@ -101,6 +101,8 @@ class ManualControlTab(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
 
         device_box = QGroupBox("Controlador ESP32")
         device_layout = QGridLayout(device_box)
@@ -124,6 +126,10 @@ class ManualControlTab(QWidget):
         device_layout.addWidget(self.status, 2, 0, 1, 3)
         device_layout.addWidget(self.connect_button, 2, 3)
         layout.addWidget(device_box)
+        controls = QGridLayout()
+        controls.setHorizontalSpacing(14)
+        controls.setVerticalSpacing(14)
+        layout.addLayout(controls)
 
         color_box = QGroupBox("Color activo")
         color_layout = QFormLayout(color_box)
@@ -137,7 +143,7 @@ class ManualControlTab(QWidget):
         brightness_layout = QHBoxLayout(); brightness_layout.addWidget(self.brightness); brightness_layout.addWidget(self.brightness_label)
         color_layout.addRow("Color:", self.color_button)
         color_layout.addRow("Intensidad:", brightness_layout)
-        layout.addWidget(color_box)
+        controls.addWidget(color_box, 0, 0)
 
         single_box = QGroupBox("LED único")
         single = QFormLayout(single_box)
@@ -146,7 +152,7 @@ class ManualControlTab(QWidget):
         set_led.clicked.connect(self._set_single_led)
         single.addRow("Índice LED:", self.single_index)
         single.addRow(set_led)
-        layout.addWidget(single_box)
+        controls.addWidget(single_box, 0, 1)
 
         range_box = QGroupBox("Rango de LEDs")
         range_control = QFormLayout(range_box)
@@ -159,7 +165,7 @@ class ManualControlTab(QWidget):
         range_control.addRow("LED inicial:", self.range_start)
         range_control.addRow("Cantidad:", span_layout)
         range_control.addRow(set_range)
-        layout.addWidget(range_box)
+        controls.addWidget(range_box, 1, 0)
 
         piano_box = QGroupBox("Piano virtual")
         piano_layout = QVBoxLayout(piano_box)
@@ -167,7 +173,7 @@ class ManualControlTab(QWidget):
         open_piano = QPushButton("Abrir piano virtual")
         open_piano.clicked.connect(self._open_virtual_piano)
         piano_layout.addWidget(open_piano)
-        layout.addWidget(piano_box)
+        controls.addWidget(piano_box, 1, 1)
 
         strip_box = QGroupBox("Toda la tira")
         strip = QHBoxLayout(strip_box)
@@ -176,7 +182,7 @@ class ManualControlTab(QWidget):
         clear = QPushButton("Apagar todo")
         clear.clicked.connect(self._clear)
         strip.addWidget(fill); strip.addWidget(clear)
-        layout.addWidget(strip_box)
+        controls.addWidget(strip_box, 2, 0, 1, 2)
 
         effects_box = QGroupBox("Efectos")
         effects = QHBoxLayout(effects_box)
@@ -187,7 +193,7 @@ class ManualControlTab(QWidget):
         stop = QPushButton("Detener")
         stop.clicked.connect(self._stop_effect)
         effects.addWidget(rainbow); effects.addWidget(sweep); effects.addWidget(stop)
-        layout.addWidget(effects_box)
+        controls.addWidget(effects_box, 3, 0, 1, 2)
         layout.addStretch()
         self.apply_mapping_config(self._mapping_config)
 
