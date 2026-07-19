@@ -9,15 +9,10 @@ namespace {
 CRGB pixels[MAX_LED_COUNT];
 uint8_t active_led_count = LED_COUNT;
 uint8_t current_brightness = LED_BRIGHTNESS;
-enum class Animation : uint8_t { None, Sweep, Rainbow, CenterWave };
+enum class Animation : uint8_t { None, CenterWave };
 Animation active_animation = Animation::None;
-uint8_t sweep_red = 0;
-uint8_t sweep_green = 0;
-uint8_t sweep_blue = 0;
-uint16_t sweep_index = 0;
-uint16_t sweep_interval_ms = 55;
-uint32_t sweep_last_step_ms = 0;
-uint8_t rainbow_hue = 0;
+uint16_t animation_interval_ms = 12;
+uint32_t animation_last_step_ms = 0;
 uint16_t wave_left = 0;
 uint16_t wave_right = 0;
 constexpr uint8_t MAX_NOTE_WAVES = 8;
@@ -117,28 +112,11 @@ void leds_set_count(uint8_t count) {
   FastLED.show();
 }
 
-void leds_start_sweep(uint8_t red, uint8_t green, uint8_t blue, uint16_t interval_ms) {
-  sweep_red = red;
-  sweep_green = green;
-  sweep_blue = blue;
-  sweep_interval_ms = interval_ms < 8 ? 8 : interval_ms;
-  sweep_index = 0;
-  sweep_last_step_ms = 0;
-  active_animation = Animation::Sweep;
-}
-
-void leds_start_rainbow(uint16_t interval_ms) {
-  sweep_interval_ms = interval_ms < 8 ? 8 : interval_ms;
-  rainbow_hue = 0;
-  sweep_last_step_ms = 0;
-  active_animation = Animation::Rainbow;
-}
-
 void leds_start_center_wave(uint16_t interval_ms) {
-  sweep_interval_ms = interval_ms < 8 ? 8 : interval_ms;
+  animation_interval_ms = interval_ms < 8 ? 8 : interval_ms;
   wave_left = (active_led_count - 1) / 2;
   wave_right = active_led_count / 2;
-  sweep_last_step_ms = 0;
+  animation_last_step_ms = 0;
   active_animation = Animation::CenterWave;
 }
 
@@ -208,17 +186,10 @@ void leds_animation_handle() {
     return;
   }
   if (active_animation == Animation::None) return;
-  if (now - sweep_last_step_ms < sweep_interval_ms) return;
+  if (now - animation_last_step_ms < animation_interval_ms) return;
 
-  sweep_last_step_ms = now;
-  if (active_animation == Animation::Sweep) {
-    leds_show_range(sweep_index, 2, sweep_red, sweep_green, sweep_blue);
-    sweep_index = active_led_count < 2 || sweep_index >= active_led_count - 2 ? 0 : sweep_index + 1;
-  } else if (active_animation == Animation::Rainbow) {
-    fill_rainbow(pixels, active_led_count, rainbow_hue, 255 / active_led_count);
-    FastLED.show();
-    ++rainbow_hue;
-  } else {
+  animation_last_step_ms = now;
+  {
     fill_solid(pixels, active_led_count, CRGB::Black);
     pixels[wave_left] = CRGB::White;
     pixels[wave_right] = CRGB::White;
