@@ -67,6 +67,23 @@ class MidiLedStateTests(unittest.TestCase):
         agent.handle_message(Message())
         self.assertTrue(agent._pending_waves)
 
+    def test_midi_through_forwards_before_led_processing(self):
+        class Output:
+            def __init__(self): self.messages = []
+            def send(self, message): self.messages.append(message)
+
+        class Message:
+            type = "note_on"
+            note = FIRST_MIDI_NOTE
+            velocity = 100
+
+        output = Output()
+        agent = MidiLedAgent(object(), (255, 255, 255))
+        agent.set_midi_through(output)
+        message = Message()
+        agent.handle_message(message)
+        self.assertEqual(output.messages, [message])
+
     def test_chord_keeps_both_notes_lit(self):
         state = MidiLedState((255, 255, 255))
         state.note_on(60, 127)

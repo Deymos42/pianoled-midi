@@ -17,7 +17,7 @@ Aplicación de escritorio Windows para visualizar un piano MIDI en una tira de L
 ### 1. Firmware ESP32
 
 1. Copia `firmware/main/config.example.h` como `firmware/main/config.h`.
-2. Edita esa copia con la configuración física de tu tira. Las credenciales Wi-Fi sólo se usan opcionalmente para actualizaciones OTA.
+2. Edita esa copia con la configuración física de tu tira, el nombre Bluetooth y, si quieres, el PIN de emparejamiento.
 3. Abre `firmware/main/main.ino` en Arduino IDE.
 4. Instala la biblioteca **FastLED**, selecciona **ESP32 Dev Module** y sube el firmware por USB.
 
@@ -39,7 +39,11 @@ En la pestaña MIDI selecciona el piano y el ESP32. Se recomienda USB serie para
 
 Los ESP32 clásicos pueden exponer **PianoLED MIDI** como Bluetooth serie (SPP). Tras subir el firmware, en Windows ve a **Configuración > Bluetooth y dispositivos > Agregar dispositivo > Bluetooth**, selecciona `PianoLED MIDI` e introduce el PIN `1234` (puedes cambiarlo en `config.h`). Windows creará un puerto COM; pulsa **Actualizar puertos** en la aplicación y selecciónalo.
 
-Bluetooth es práctico sin cable, pero para interpretar MIDI rápido se recomienda el COM USB por su latencia más estable. Las variantes ESP32-C3, C6 y S3 no proporcionan Bluetooth clásico SPP; en ellas esta función se desactiva automáticamente.
+Bluetooth es práctico sin cable, pero para interpretar MIDI rápido se recomienda el COM USB por su latencia más estable. Las variantes ESP32-C3, C6 y S3 no proporcionan Bluetooth clásico SPP; en ellas esta función se desactiva automáticamente. El firmware final no contiene Wi-Fi ni OTA: las actualizaciones se suben por USB.
+
+### Grabar simultáneamente en Reaper
+
+En Windows instala **loopMIDI** y crea un puerto, por ejemplo `PianoLED MIDI Thru`. En PianoLED, selecciona ese nombre en **Enviar también a** antes de iniciar MIDI. Después, en Reaper activa `PianoLED MIDI Thru` como entrada MIDI de la pista. PianoLED reenviará todos los mensajes del piano al DAW mientras controla los LEDs.
 
 ## Estructura
 

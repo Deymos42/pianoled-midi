@@ -1,12 +1,6 @@
 #pragma once
 
 // Copy this file to config.h. config.h is deliberately excluded from Git.
-#define WIFI_SSID "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
-
-#define DEVICE_HOSTNAME "pianoled"
-#define OTA_PASSWORD "change-this-password"
-
 // Bluetooth Classic SPP. Windows exposes the paired device as a COM port.
 #define BLUETOOTH_DEVICE_NAME "PianoLED MIDI"
 #define BLUETOOTH_PIN "1234"

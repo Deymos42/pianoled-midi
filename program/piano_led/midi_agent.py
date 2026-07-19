@@ -163,6 +163,7 @@ class MidiLedAgent:
         self._pending_ranges: dict[int, tuple[int, int, int, int, int]] = {}
         self._pending_waves: list[tuple[int, int, int, int]] = []
         self._pending_fades: list[tuple[int, int, int, int, int, int]] = []
+        self._midi_through: Any | None = None
         self._full_frame_pending = False
         self._stop = threading.Event()
         self._worker = threading.Thread(target=self._send_frames, name="pianoled-midi-output", daemon=True)
@@ -184,6 +185,13 @@ class MidiLedAgent:
         self.client.close()
 
     def handle_message(self, message: Any) -> None:
+        # Keep the music available to a DAW while PianoLED reacts to it.
+        if self._midi_through is not None:
+            try:
+                self._midi_through.send(message)
+            except Exception:
+                # A disconnected DAW route must never interrupt LED playback.
+                pass
         changed = False
         changed_note: int | None = None
         requires_full_frame = False
@@ -256,6 +264,9 @@ class MidiLedAgent:
             self._pending_fades.clear()
             self._full_frame_pending = effect_mode in {"direct", "fade", "constellation"}
             self._frame_ready.set()
+
+    def set_midi_through(self, output: Any | None) -> None:
+        self._midi_through = output
 
     def set_fade_duration(self, duration_ms: int) -> None:
         with self._lock:

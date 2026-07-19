@@ -159,6 +159,7 @@ class MidiWindow(QMainWindow):
         self._mido: Any = mido
         self._agent: MidiLedAgent | None = None
         self._input_port: Any = None
+        self._midi_through: Any = None
         self._color = QColor("#ffffff")
         try:
             self._mapping_config = load_user_mapping_config()
@@ -169,6 +170,7 @@ class MidiWindow(QMainWindow):
         self.setMinimumSize(860, 620)
         self._build_ui()
         self._refresh_ports()
+        self._refresh_through_ports()
         self._refresh_serial_ports()
         self._refresh_color_button()
 
@@ -217,6 +219,17 @@ class MidiWindow(QMainWindow):
         port_row.addWidget(self.port_list)
         port_row.addWidget(refresh)
         piano_form.addRow("Entrada MIDI:", port_row)
+        through_row = QHBoxLayout()
+        self.through_port = QComboBox()
+        through_refresh = QPushButton("Actualizar salidas")
+        through_refresh.clicked.connect(self._refresh_through_ports)
+        through_row.addWidget(self.through_port)
+        through_row.addWidget(through_refresh)
+        piano_form.addRow("Enviar también a:", through_row)
+        through_hint = QLabel("Para grabar en Reaper, crea un puerto con loopMIDI y selecciónalo aquí.")
+        through_hint.setObjectName("hint")
+        through_hint.setWordWrap(True)
+        piano_form.addRow(through_hint)
         grid.addWidget(piano_box, 0, 0)
 
         device_box = QGroupBox("2. Controlador LED (USB o Bluetooth)")
@@ -352,6 +365,16 @@ class MidiWindow(QMainWindow):
             else:
                 self.serial_port.setEditText(current)
 
+    def _refresh_through_ports(self) -> None:
+        current = self.through_port.currentData()
+        self.through_port.clear()
+        self.through_port.addItem("No reenviar MIDI", None)
+        self.through_port.addItems(self._mido.get_output_names())
+        if current:
+            index = self.through_port.findData(current)
+            if index >= 0:
+                self.through_port.setCurrentIndex(index)
+
     def _transport_changed(self) -> None:
         self.serial_port.setEnabled(self._agent is None)
 
@@ -455,9 +478,14 @@ class MidiWindow(QMainWindow):
             QMessageBox.warning(self, "PianoLED MIDI", "Selecciona una entrada MIDI y el destino del ESP32.")
             return
         agent: MidiLedAgent | None = None
+        midi_through: Any = None
         try:
+            through_name = self.through_port.currentText() if self.through_port.currentIndex() > 0 else ""
+            if through_name:
+                midi_through = self._mido.open_output(through_name)
             client = SerialLedClient(SerialLedClient.port_name(serial_label), color_order=self._mapping_config.color_order)
             agent = MidiLedAgent(client, self._rgb(), self._key_ranges, self.midi_effect.currentData())
+            agent.set_midi_through(midi_through)
             agent.state.set_color_style(self.color_style.currentData(), self._palette_rgb(self.left_color), self._palette_rgb(self.right_color), self.split_key.value())
             agent.state.set_sustain_enabled(self.sustain.isChecked())
             agent.state.set_velocity_sensitive(self.velocity.isChecked())
@@ -467,12 +495,16 @@ class MidiWindow(QMainWindow):
             agent.client.set_brightness(self.brightness.value())
             self._input_port = self._mido.open_input(port_name, callback=agent.handle_message)
             self._agent = agent
+            self._midi_through = midi_through
         except Exception as error:
             if agent:
                 agent.close()
+            if midi_through:
+                midi_through.close()
             QMessageBox.warning(self, "PianoLED MIDI", str(error))
             return
         self.port_list.setEnabled(False)
+        self.through_port.setEnabled(False)
         self.serial_port.setEnabled(False)
         self.status.setText(f"Activo: {port_name}")
         self.connection_badge.setText("●  MIDI activo")
@@ -488,7 +520,11 @@ class MidiWindow(QMainWindow):
         if self._agent:
             self._agent.close()
             self._agent = None
+        if self._midi_through:
+            self._midi_through.close()
+            self._midi_through = None
         self.port_list.setEnabled(True)
+        self.through_port.setEnabled(True)
         self._transport_changed()
         self.status.setText("MIDI detenido.")
         self.connection_badge.setText("●  Listo para configurar")
