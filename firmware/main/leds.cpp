@@ -51,21 +51,6 @@ void leds_begin() {
   leds_clear();
 }
 
-void leds_startup_sequence() {
-  constexpr uint16_t step_duration_ms = 500;
-  constexpr uint16_t total_duration_ms = 5000;
-  constexpr uint8_t leds_to_test = 3;
-
-  for (uint8_t index = 0; index < leds_to_test && index < active_led_count; ++index) {
-    pixels[index] = CRGB::Red;
-    FastLED.show();
-    delay(step_duration_ms);
-  }
-
-  delay(total_duration_ms - leds_to_test * step_duration_ms);
-  leds_clear();
-}
-
 void leds_set(uint8_t index, uint8_t red, uint8_t green, uint8_t blue) {
   if (index >= active_led_count) return;
   pixels[index] = CRGB(red, green, blue);

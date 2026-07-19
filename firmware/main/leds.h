@@ -3,7 +3,6 @@
 #include <Arduino.h>
 
 void leds_begin();
-void leds_startup_sequence();
 void leds_set(uint8_t index, uint8_t red, uint8_t green, uint8_t blue);
 void leds_set_range(uint8_t start, uint8_t count, uint8_t red, uint8_t green, uint8_t blue);
 void leds_set_ranges(const uint8_t* ranges, uint8_t range_count);

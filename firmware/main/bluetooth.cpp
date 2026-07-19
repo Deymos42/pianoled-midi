@@ -22,8 +22,6 @@ BluetoothSerial bluetooth_serial;
 void bluetooth_begin() {
   bluetooth_serial.begin(BLUETOOTH_DEVICE_NAME);
   bluetooth_serial.setPin(BLUETOOTH_PIN, strlen(BLUETOOTH_PIN));
-  Serial.print("Bluetooth SPP ready: ");
-  Serial.println(BLUETOOTH_DEVICE_NAME);
 }
 
 void bluetooth_handle() { serial_control_handle_stream(bluetooth_serial); }
@@ -31,7 +29,7 @@ bool bluetooth_available() { return true; }
 
 #else
 
-void bluetooth_begin() { Serial.println("Bluetooth Classic is not available on this ESP32 variant"); }
+void bluetooth_begin() {}
 void bluetooth_handle() {}
 bool bluetooth_available() { return false; }
 
